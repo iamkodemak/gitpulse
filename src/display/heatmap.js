@@ -51,6 +51,25 @@ function groupIntoWeeks(contributionMap) {
 }
 
 /**
+ * Calculates summary statistics from a contribution map.
+ * @param {Map<string, number>} contributionMap
+ * @returns {{ total: number, max: number, activeDays: number }}
+ */
+function getContributionStats(contributionMap) {
+  let total = 0;
+  let max = 0;
+  let activeDays = 0;
+
+  for (const count of contributionMap.values()) {
+    total += count;
+    if (count > max) max = count;
+    if (count > 0) activeDays++;
+  }
+
+  return { total, max, activeDays };
+}
+
+/**
  * Renders the heatmap as a string for terminal output.
  * @param {Map<string, number>} contributionMap
  * @returns {string}
@@ -70,7 +89,11 @@ function renderHeatmap(contributionMap) {
     lines.push(`${label}${row}`);
   }
 
+  const { total, activeDays } = getContributionStats(contributionMap);
+  lines.push('');
+  lines.push(`Total: ${total} contributions over ${activeDays} active days`);
+
   return lines.join('\n') + '\n';
 }
 
-module.exports = { renderHeatmap, groupIntoWeeks, countToBlock };
+module.exports = { renderHeatmap, groupIntoWeeks, countToBlock, getContributionStats };
