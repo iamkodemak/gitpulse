@@ -1,59 +1,61 @@
-import { bold, fg256, dim } from './colors.js';
+import { bold, dim, fg256 } from './colors.js';
 import { sectionHeader } from './formatter.js';
-import { renderHeatmap, getContributionStats } from './heatmap.js';
+import { renderHeatmap } from './heatmap.js';
 import { renderSparklineRow } from './sparkline.js';
 import { renderSummary } from './summary.js';
 import { renderTimeline } from './timeline.js';
+import { renderRepoList } from './repolist.js';
 
+/**
+ * Render the stats block (total, streak, etc.).
+ */
 export function renderStats(stats) {
-  const lines = [];
-  lines.push(sectionHeader('Stats'));
-  lines.push(`  ${bold('Total:')}  ${fg256(75)(String(stats.total))}`);
-  lines.push(`  ${bold('Avg/day:')} ${fg256(75)(stats.avgPerDay.toFixed(2))}`);
-  lines.push(`  ${bold('Peak:')}   ${fg256(214)(String(stats.peak))} ${dim('on ' + (stats.peakDate || 'N/A'))}`);
-  lines.push('');
+  const lines = [
+    sectionHeader('Contribution Stats'),
+    `  ${bold('Total events:')}  ${fg256(75, stats.total)}`,
+    `  ${bold('Active days:')}   ${fg256(75, stats.activeDays)}`,
+    `  ${bold('Longest streak:')} ${fg256(226, stats.longestStreak)} days`,
+  ];
   return lines.join('\n');
 }
 
+/**
+ * Render the current streak block.
+ */
 export function renderStreak(streak) {
-  const lines = [];
-  lines.push(sectionHeader('Streak'));
-  lines.push(`  ${bold('Current:')} ${fg256(214)(String(streak.current))} days`);
-  lines.push(`  ${bold('Longest:')} ${fg256(75)(String(streak.longest))} days`);
-  lines.push('');
-  return lines.join('\n');
+  if (!streak || streak.current === 0) {
+    return dim('  No active streak.');
+  }
+  return [
+    sectionHeader('Current Streak'),
+    `  ${fg256(226, '🔥')} ${bold(streak.current)} day${streak.current !== 1 ? 's' : ''} in a row`,
+    `  Started: ${dim(streak.start)}`,
+  ].join('\n');
 }
 
-export function renderDashboard({
-  contributionMap,
-  stats,
-  streak,
-  eventCounts,
-  username,
-  showTimeline = false,
-}) {
-  const lines = [];
-  lines.push('');
-  lines.push(bold(fg256(75)(`  GitPulse — ${username}`)));
-  lines.push('');
-  lines.push(renderHeatmap(contributionMap));
-  lines.push(renderStats(stats));
-  lines.push(renderStreak(streak));
+/**
+ * Render the full dashboard combining all panels.
+ * @param {object} data
+ * @param {object} options
+ */
+export function renderDashboard(data, options = {}) {
+  const { contributions, stats, streak, repos } = data;
+  const parts = [];
 
-  if (eventCounts) {
-    lines.push(renderSummary(contributionMap, eventCounts));
+  parts.push(renderHeatmap(contributions));
+  parts.push('');
+  parts.push(renderStats(stats));
+  parts.push('');
+  parts.push(renderStreak(streak));
+  parts.push('');
+  parts.push(renderSummary(contributions));
+  parts.push('');
+  parts.push(renderTimeline(contributions));
+
+  if (repos && repos.length > 0) {
+    parts.push('');
+    parts.push(renderRepoList(repos, { limit: options.repoLimit ?? 5 }));
   }
 
-  if (showTimeline) {
-    lines.push(renderTimeline(contributionMap, 6, 5));
-  }
-
-  const { dailyCounts } = getContributionStats(contributionMap);
-  if (dailyCounts && dailyCounts.length > 0) {
-    lines.push(sectionHeader('Daily Sparkline'));
-    lines.push(renderSparklineRow(dailyCounts.slice(-60)));
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return parts.join('\n');
 }
