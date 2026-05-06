@@ -1,54 +1,59 @@
-/**
- * Display module — formats and renders contribution data for terminal output.
- */
+import { bold, fg256, dim } from './colors.js';
+import { sectionHeader } from './formatter.js';
+import { renderHeatmap, getContributionStats } from './heatmap.js';
+import { renderSparklineRow } from './sparkline.js';
+import { renderSummary } from './summary.js';
+import { renderTimeline } from './timeline.js';
 
-const { renderHeatmap } = require('./heatmap');
-
-/**
- * Renders a summary stats block.
- * @param {{ totalContributions: number, avgPerDay: number, activeDays: number }} stats
- * @returns {string}
- */
-function renderStats(stats) {
-  if (!stats) return 'No stats available.\n';
-  const { totalContributions, avgPerDay, activeDays } = stats;
-  return [
-    '─'.repeat(40),
-    `  Total Contributions : ${totalContributions}`,
-    `  Active Days         : ${activeDays}`,
-    `  Avg per Active Day  : ${avgPerDay.toFixed(2)}`,
-    '─'.repeat(40),
-  ].join('\n') + '\n';
+export function renderStats(stats) {
+  const lines = [];
+  lines.push(sectionHeader('Stats'));
+  lines.push(`  ${bold('Total:')}  ${fg256(75)(String(stats.total))}`);
+  lines.push(`  ${bold('Avg/day:')} ${fg256(75)(stats.avgPerDay.toFixed(2))}`);
+  lines.push(`  ${bold('Peak:')}   ${fg256(214)(String(stats.peak))} ${dim('on ' + (stats.peakDate || 'N/A'))}`);
+  lines.push('');
+  return lines.join('\n');
 }
 
-/**
- * Renders a streak summary.
- * @param {{ current: number, longest: number }} streak
- * @returns {string}
- */
-function renderStreak(streak) {
-  if (!streak) return 'No streak data available.\n';
-  return [
-    `  🔥 Current Streak : ${streak.current} day(s)`,
-    `  🏆 Longest Streak : ${streak.longest} day(s)`,
-  ].join('\n') + '\n';
+export function renderStreak(streak) {
+  const lines = [];
+  lines.push(sectionHeader('Streak'));
+  lines.push(`  ${bold('Current:')} ${fg256(214)(String(streak.current))} days`);
+  lines.push(`  ${bold('Longest:')} ${fg256(75)(String(streak.longest))} days`);
+  lines.push('');
+  return lines.join('\n');
 }
 
-/**
- * Renders the full dashboard view.
- * @param {Map<string, number>} contributionMap
- * @param {object} stats
- * @param {object} streak
- * @returns {string}
- */
-function renderDashboard(contributionMap, stats, streak) {
-  const sections = [
-    '\n  GitPulse — Contribution Dashboard\n',
-    renderHeatmap(contributionMap),
-    renderStats(stats),
-    renderStreak(streak),
-  ];
-  return sections.join('\n');
-}
+export function renderDashboard({
+  contributionMap,
+  stats,
+  streak,
+  eventCounts,
+  username,
+  showTimeline = false,
+}) {
+  const lines = [];
+  lines.push('');
+  lines.push(bold(fg256(75)(`  GitPulse — ${username}`)));
+  lines.push('');
+  lines.push(renderHeatmap(contributionMap));
+  lines.push(renderStats(stats));
+  lines.push(renderStreak(streak));
 
-module.exports = { renderDashboard, renderStats, renderStreak };
+  if (eventCounts) {
+    lines.push(renderSummary(contributionMap, eventCounts));
+  }
+
+  if (showTimeline) {
+    lines.push(renderTimeline(contributionMap, 6, 5));
+  }
+
+  const { dailyCounts } = getContributionStats(contributionMap);
+  if (dailyCounts && dailyCounts.length > 0) {
+    lines.push(sectionHeader('Daily Sparkline'));
+    lines.push(renderSparklineRow(dailyCounts.slice(-60)));
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
