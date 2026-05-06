@@ -60,3 +60,23 @@ function computeStreak(contributionMap) {
   }
   return streak;
 }
+
+/**
+ * Returns the most active day of the week based on a contribution map.
+ * Returns a string like "Monday", or null if the map is empty.
+ */
+export function mostActiveDayOfWeek(contributionMap) {
+  const dayCounts = new Array(7).fill(0);
+
+  for (const [date, count] of Object.entries(contributionMap)) {
+    const day = new Date(date).getUTCDay();
+    dayCounts[day] += count;
+  }
+
+  const maxCount = Math.max(...dayCounts);
+  if (maxCount === 0) return null;
+
+  const dayIndex = dayCounts.indexOf(maxCount);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return dayNames[dayIndex];
+}
