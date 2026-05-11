@@ -1,59 +1,51 @@
 /**
- * Utilities for identifying trending repositories and activity spikes
- * based on recent contribution data.
+ * trending.js — Utilities for computing repo momentum and detecting activity spikes.
  */
 
+const DEFAULT_SPIKE_THRESHOLD = 50;
+const RECENCY_WEIGHT = 0.4;
+const STAR_WEIGHT = 1.0;
+const FORK_WEIGHT = 1.5;
+
 /**
- * Calculate a simple momentum score for a repo based on recent vs older stars/activity.
- * @param {Object} repo - Repository object
- * @param {number} windowDays - Number of days to consider "recent"
- * @returns {number} momentum score (higher = more trending)
+ * Compute a momentum score for a repo based on stars, forks, and recency.
+ * @param {object} repo
+ * @returns {number}
  */
-function computeMomentum(repo, windowDays = 30) {
-  if (!repo || typeof repo.stargazers_count !== 'number') return 0;
-  const age = repo.age_days || 1;
-  const recencyFactor = Math.max(1, windowDays / Math.min(age, windowDays));
-  return Math.round((repo.stargazers_count / Math.max(age, 1)) * recencyFactor * 100) / 100;
+export function computeMomentum(repo) {
+  const stars = repo.stargazers_count || 0;
+  const forks = repo.forks_count || 0;
+  const pushedAt = repo.pushed_at ? new Date(repo.pushed_at) : null;
+
+  const daysSincePush = pushedAt
+    ? Math.max(1, (Date.now() - pushedAt.getTime()) / (1000 * 60 * 60 * 24))
+    : 365;
+
+  const recencyBoost = RECENCY_WEIGHT * (1 / Math.log1p(daysSincePush));
+  const score = STAR_WEIGHT * stars + FORK_WEIGHT * forks + recencyBoost * (stars + forks);
+
+  return Math.round(score * 100) / 100;
 }
 
 /**
- * Detect activity spikes: days where contributions exceed threshold multiplier
- * relative to the user's average.
- * @param {Object} contributionMap - { dateStr: count }
- * @param {number} multiplier - How many times above average counts as a spike
- * @returns {Array<{ date: string, count: number, ratio: number }>}
+ * Detect repos whose star count exceeds a threshold.
+ * @param {object[]} repos
+ * @param {number} threshold
+ * @returns {object[]}
  */
-function detectSpikes(contributionMap, multiplier = 2.0) {
-  const entries = Object.entries(contributionMap);
-  if (entries.length === 0) return [];
-
-  const total = entries.reduce((sum, [, v]) => sum + v, 0);
-  const avg = total / entries.length;
-  if (avg === 0) return [];
-
-  return entries
-    .filter(([, count]) => count >= avg * multiplier)
-    .map(([date, count]) => ({
-      date,
-      count,
-      ratio: Math.round((count / avg) * 100) / 100,
-    }))
-    .sort((a, b) => b.count - a.count);
+export function detectSpikes(repos, threshold = DEFAULT_SPIKE_THRESHOLD) {
+  return repos.filter(repo => (repo.stargazers_count || 0) >= threshold);
 }
 
 /**
- * Rank repos by a given sort key, returning the top N.
- * @param {Array<Object>} repos
- * @param {string} key - Field to rank by
- * @param {number} topN
- * @returns {Array<Object>}
+ * Return top N repos sorted descending by a numeric key.
+ * @param {object[]} repos
+ * @param {string} key
+ * @param {number} n
+ * @returns {object[]}
  */
-function topReposByKey(repos, key = 'stargazers_count', topN = 5) {
-  if (!Array.isArray(repos)) return [];
+export function topReposByKey(repos, key, n = 5) {
   return [...repos]
-    .filter((r) => typeof r[key] === 'number')
-    .sort((a, b) => b[key] - a[key])
-    .slice(0, topN);
+    .sort((a, b) => (b[key] || 0) - (a[key] || 0))
+    .slice(0, n);
 }
-
-module.exports = { computeMomentum, detectSpikes, topReposByKey };
