@@ -17,6 +17,14 @@ describe('categorizeEvent', () => {
   it('maps IssuesEvent to issues', () => {
     expect(categorizeEvent('IssuesEvent')).toBe('issues');
   });
+
+  it('maps CreateEvent to other', () => {
+    expect(categorizeEvent('CreateEvent')).toBe('other');
+  });
+
+  it('returns other for empty string', () => {
+    expect(categorizeEvent('')).toBe('other');
+  });
 });
 
 describe('countEventTypes', () => {
@@ -55,6 +63,17 @@ describe('aggregateContributions', () => {
     expect(result.total).toBe(0);
     expect(result.commits).toBe(0);
   });
+
+  it('counts other events in other category', () => {
+    const events = [
+      { type: 'CreateEvent' },
+      { type: 'WatchEvent' },
+    ];
+    const result = aggregateContributions(events);
+    expect(result.total).toBe(2);
+    expect(result.other).toBe(2);
+    expect(result.commits).toBe(0);
+  });
 });
 
 describe('extractCommitCount', () => {
@@ -70,6 +89,10 @@ describe('extractCommitCount', () => {
   it('returns 0 when payload is missing', () => {
     expect(extractCommitCount({ type: 'PushEvent' })).toBe(0);
   });
+
+  it('returns 0 when commits array is empty', () => {
+    expect(extractCommitCount({ type: 'PushEvent', payload: { commits: [] } })).toBe(0);
+  });
 });
 
 describe('totalCommitCount', () => {
@@ -84,5 +107,9 @@ describe('totalCommitCount', () => {
 
   it('returns 0 with no push events', () => {
     expect(totalCommitCount([{ type: 'IssuesEvent' }])).toBe(0);
+  });
+
+  it('returns 0 for empty events array', () => {
+    expect(totalCommitCount([])).toBe(0);
   });
 });
