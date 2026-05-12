@@ -1,61 +1,56 @@
-import { bold, dim, fg256 } from './colors.js';
-import { sectionHeader } from './formatter.js';
-import { renderHeatmap } from './heatmap.js';
-import { renderSparklineRow } from './sparkline.js';
-import { renderSummary } from './summary.js';
-import { renderTimeline } from './timeline.js';
-import { renderRepoList } from './repolist.js';
-
 /**
- * Render the stats block (total, streak, etc.).
+ * High-level display orchestration — assembles dashboard sections.
  */
+import { renderHeatmap } from "./heatmap.js";
+import { renderTimeline } from "./timeline.js";
+import { renderSummary } from "./summary.js";
+import { renderRateLimitBar } from "./ratelimitbar.js";
+import { renderUserCard } from "./usercard.js";
+import { renderTrendingPanel } from "./trendingpanel.js";
+import { renderActivityPanel } from "./activitypanel.js";
+import { renderRepoList } from "./repolist.js";
+import { renderLanguageChart } from "./languagechart.js";
+import { bold } from "./colors.js";
+
 export function renderStats(stats) {
-  const lines = [
-    sectionHeader('Contribution Stats'),
-    `  ${bold('Total events:')}  ${fg256(75, stats.total)}`,
-    `  ${bold('Active days:')}   ${fg256(75, stats.activeDays)}`,
-    `  ${bold('Longest streak:')} ${fg256(226, stats.longestStreak)} days`,
-  ];
-  return lines.join('\n');
+  return renderSummary(stats);
 }
 
-/**
- * Render the current streak block.
- */
 export function renderStreak(streak) {
-  if (!streak || streak.current === 0) {
-    return dim('  No active streak.');
-  }
+  const { current = 0, longest = 0 } = streak || {};
   return [
-    sectionHeader('Current Streak'),
-    `  ${fg256(226, '🔥')} ${bold(streak.current)} day${streak.current !== 1 ? 's' : ''} in a row`,
-    `  Started: ${dim(streak.start)}`,
-  ].join('\n');
+    bold("  Streak"),
+    `  Current : ${current} day${current !== 1 ? "s" : ""}`,
+    `  Longest : ${longest} day${longest !== 1 ? "s" : ""}`,
+    "",
+  ].join("\n");
 }
 
-/**
- * Render the full dashboard combining all panels.
- * @param {object} data
- * @param {object} options
- */
-export function renderDashboard(data, options = {}) {
-  const { contributions, stats, streak, repos } = data;
-  const parts = [];
+export function renderDashboard(data) {
+  const {
+    user,
+    contributions,
+    stats,
+    streak,
+    repos,
+    langBytes,
+    trending,
+    activityProfile,
+    rateLimit,
+  } = data;
 
-  parts.push(renderHeatmap(contributions));
-  parts.push('');
-  parts.push(renderStats(stats));
-  parts.push('');
-  parts.push(renderStreak(streak));
-  parts.push('');
-  parts.push(renderSummary(contributions));
-  parts.push('');
-  parts.push(renderTimeline(contributions));
+  const sections = [];
 
-  if (repos && repos.length > 0) {
-    parts.push('');
-    parts.push(renderRepoList(repos, { limit: options.repoLimit ?? 5 }));
-  }
+  if (user) sections.push(renderUserCard(user));
+  if (contributions) sections.push(renderHeatmap(contributions));
+  if (stats) sections.push(renderStats(stats));
+  if (streak) sections.push(renderStreak(streak));
+  if (contributions) sections.push(renderTimeline(contributions));
+  if (activityProfile) sections.push(renderActivityPanel(activityProfile));
+  if (langBytes) sections.push(renderLanguageChart(langBytes));
+  if (trending) sections.push(renderTrendingPanel(trending));
+  if (repos && repos.length) sections.push(renderRepoList(repos));
+  if (rateLimit) sections.push(renderRateLimitBar(rateLimit));
 
-  return parts.join('\n');
+  return sections.join("\n");
 }
