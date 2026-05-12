@@ -13,6 +13,14 @@ describe("langChartColor", () => {
     const color = langChartColor("COBOL");
     expect(stripAnsi(color("x"))).toBe("x");
   });
+
+  it("returns a function for known languages like Python and Rust", () => {
+    for (const lang of ["Python", "Rust", "Go", "TypeScript"]) {
+      const color = langChartColor(lang);
+      expect(typeof color).toBe("function");
+      expect(stripAnsi(color(lang))).toBe(lang);
+    }
+  });
 });
 
 describe("renderLangBar", () => {
@@ -31,6 +39,12 @@ describe("renderLangBar", () => {
   it("renders 100% as full bar", () => {
     const row = renderLangBar("Rust", 100);
     expect(stripAnsi(row)).toContain("100.0%");
+  });
+
+  it("formats percentage to one decimal place", () => {
+    const row = stripAnsi(renderLangBar("Go", 33.333));
+    expect(row).toContain("33.3%");
+    expect(row).not.toContain("33.333");
   });
 });
 
@@ -57,5 +71,12 @@ describe("renderLanguageChart", () => {
   it("handles empty input gracefully", () => {
     const out = stripAnsi(renderLanguageChart({}));
     expect(out).toContain("No language data");
+  });
+
+  it("sorts languages by byte count descending", () => {
+    const plain = stripAnsi(renderLanguageChart(langBytes));
+    const jsIndex = plain.indexOf("JavaScript");
+    const rustIndex = plain.indexOf("Rust");
+    expect(jsIndex).toBeLessThan(rustIndex);
   });
 });
