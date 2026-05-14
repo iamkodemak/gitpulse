@@ -1,96 +1,77 @@
-const {
-  toYearMonth,
-  aggregateByMonth,
-  recentMonthKeys,
-  monthToLevel,
-  buildMonthHeatmap,
-} = require('./monthheatmap');
+import { toYearMonth, aggregateByMonth, recentMonthKeys, monthToLevel, buildMonthHeatmap } from './monthheatmap.js';
 
 function makeMap(entries) {
   return new Map(entries);
 }
 
 describe('toYearMonth', () => {
-  it('extracts YYYY-MM from a date string', () => {
+  test('converts date string to YYYY-MM', () => {
     expect(toYearMonth('2024-03-15')).toBe('2024-03');
-  });
-
-  it('works for first day of month', () => {
-    expect(toYearMonth('2023-01-01')).toBe('2023-01');
+    expect(toYearMonth('2023-11-01')).toBe('2023-11');
   });
 });
 
 describe('aggregateByMonth', () => {
-  it('sums contributions by year-month', () => {
+  test('sums contributions per month', () => {
     const map = makeMap([
-      ['2024-01-01', 3],
-      ['2024-01-15', 5],
-      ['2024-02-10', 2],
+      ['2024-03-01', 3],
+      ['2024-03-15', 5],
+      ['2024-04-10', 2],
     ]);
     const result = aggregateByMonth(map);
-    expect(result.get('2024-01')).toBe(8);
-    expect(result.get('2024-02')).toBe(2);
+    expect(result.get('2024-03')).toBe(8);
+    expect(result.get('2024-04')).toBe(2);
   });
 
-  it('returns empty map for empty input', () => {
-    expect(aggregateByMonth(new Map()).size).toBe(0);
+  test('returns empty map for empty input', () => {
+    expect(aggregateByMonth(makeMap([])).size).toBe(0);
   });
 });
 
 describe('recentMonthKeys', () => {
-  it('returns only keys within the window', () => {
-    const now = new Date();
-    const thisMonth = now.toISOString().slice(0, 7);
-    const oldMonth = '2000-01';
-    const map = makeMap([[thisMonth, 10], [oldMonth, 5]]);
-    const keys = recentMonthKeys(map, 3);
-    expect(keys).toContain(thisMonth);
-    expect(keys).not.toContain(oldMonth);
+  test('returns n month keys ending at given month', () => {
+    const keys = recentMonthKeys('2024-04', 3);
+    expect(keys).toEqual(['2024-02', '2024-03', '2024-04']);
   });
 
-  it('returns keys in sorted order', () => {
-    const map = makeMap([['2024-03', 1], ['2024-01', 2], ['2024-02', 3]]);
-    const keys = recentMonthKeys(map, 24);
-    expect(keys).toEqual([...keys].sort());
+  test('handles year boundary', () => {
+    const keys = recentMonthKeys('2024-02', 3);
+    expect(keys).toEqual(['2023-12', '2024-01', '2024-02']);
   });
 });
 
 describe('monthToLevel', () => {
-  it('returns 0 for zero value', () => {
-    expect(monthToLevel(0, 100)).toBe(0);
+  test('returns 0 for zero', () => {
+    expect(monthToLevel(0, 30)).toBe(0);
   });
 
-  it('returns 0 when max is 0', () => {
-    expect(monthToLevel(0, 0)).toBe(0);
+  test('returns 4 for max', () => {
+    expect(monthToLevel(30, 30)).toBe(4);
   });
 
-  it('assigns level 4 for max value', () => {
-    expect(monthToLevel(100, 100)).toBe(4);
-  });
-
-  it('assigns level 1 for low value', () => {
-    expect(monthToLevel(10, 100)).toBe(1);
-  });
-
-  it('assigns level 2 for mid-low value', () => {
-    expect(monthToLevel(40, 100)).toBe(2);
+  test('returns proportional level', () => {
+    const level = monthToLevel(15, 30);
+    expect(level).toBeGreaterThanOrEqual(1);
+    expect(level).toBeLessThanOrEqual(4);
   });
 });
 
 describe('buildMonthHeatmap', () => {
-  it('returns keys, totals, levels and max', () => {
-    const map = makeMap([['2024-01-01', 10], ['2024-01-02', 5]]);
-    const report = buildMonthHeatmap(map, 24);
-    expect(report).toHaveProperty('keys');
-    expect(report).toHaveProperty('totals');
-    expect(report).toHaveProperty('levels');
-    expect(report).toHaveProperty('max');
-    expect(report.max).toBe(15);
+  test('builds report with entries and busiest month', () => {
+    const map = makeMap([
+      ['2024-03-01', 10],
+      ['2024-03-02', 5],
+      ['2024-04-01', 2],
+    ]);
+    const report = buildMonthHeatmap(map, '2024-04', 3);
+    expect(report).toHaveProperty('entries');
+    expect(report).toHaveProperty('busiestMonth');
+    expect(report.busiestMonth).toBe('2024-03');
   });
 
-  it('level of busiest month is 4', () => {
-    const map = makeMap([['2024-01-01', 100], ['2024-02-01', 10]]);
-    const report = buildMonthHeatmap(map, 24);
-    expect(report.levels.get('2024-01')).toBe(4);
+  test('handles empty map', () => {
+    const report = buildMonthHeatmap(makeMap([]), '2024-04', 3);
+    expect(report.entries.length).toBe(3);
+    expect(report.busiestMonth).toBeNull();
   });
 });

@@ -1,82 +1,65 @@
 /**
- * monthheatmap.js
- * Builds a month-by-month contribution heatmap data structure.
+ * Builds a month-level heatmap from a daily contribution map.
  */
 
-/**
- * Returns a 'YYYY-MM' string from a date string or Date.
- * @param {string} dateStr
- * @returns {string}
- */
-function toYearMonth(dateStr) {
+export function toYearMonth(dateStr) {
   return dateStr.slice(0, 7);
 }
 
-/**
- * Aggregates contribution map into monthly totals.
- * @param {Map<string, number>} contributionMap - date string -> count
- * @returns {Map<string, number>} yearMonth -> total
- */
-function aggregateByMonth(contributionMap) {
+export function aggregateByMonth(contributionMap) {
   const monthly = new Map();
   for (const [date, count] of contributionMap) {
     const ym = toYearMonth(date);
-    monthly.set(ym, (monthly.get(ym) || 0) + count);
+    monthly.set(ym, (monthly.get(ym) ?? 0) + count);
   }
   return monthly;
 }
 
-/**
- * Returns sorted list of year-month keys within a window of N months back from today.
- * @param {Map<string, number>} monthlyMap
- * @param {number} months
- * @returns {string[]}
- */
-function recentMonthKeys(monthlyMap, months = 12) {
-  const now = new Date();
-  const cutoff = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
-  const cutoffStr = cutoff.toISOString().slice(0, 7);
-  return [...monthlyMap.keys()]
-    .filter((ym) => ym >= cutoffStr)
-    .sort();
-}
-
-/**
- * Assigns a heat level 0-4 based on value relative to max.
- * @param {number} value
- * @param {number} max
- * @returns {number}
- */
-function monthToLevel(value, max) {
-  if (!max || value === 0) return 0;
-  const ratio = value / max;
-  if (ratio < 0.25) return 1;
-  if (ratio < 0.5) return 2;
-  if (ratio < 0.75) return 3;
-  return 4;
-}
-
-/**
- * Builds full month heatmap report.
- * @param {Map<string, number>} contributionMap
- * @param {number} months
- * @returns {{ keys: string[], totals: Map<string, number>, levels: Map<string, number>, max: number }}
- */
-function buildMonthHeatmap(contributionMap, months = 12) {
-  const totals = aggregateByMonth(contributionMap);
-  const keys = recentMonthKeys(totals, months);
-  const max = keys.reduce((m, k) => Math.max(m, totals.get(k) || 0), 0);
-  const levels = new Map();
-  for (const k of keys) {
-    levels.set(k, monthToLevel(totals.get(k) || 0, max));
+export function recentMonthKeys(endYearMonth, n) {
+  const [year, month] = endYearMonth.split('-').map(Number);
+  const keys = [];
+  for (let i = n - 1; i >= 0; i--) {
+    let m = month - i;
+    let y = year;
+    while (m <= 0) { m += 12; y -= 1; }
+    keys.push(`${y}-${String(m).padStart(2, '0')}`);
   }
-  return { keys, totals, levels, max };
+  return keys;
 }
 
-module.exports = {
-  toYearMonth,
-  aggregateByMonth,
-  recentMonthKeys,
-  monthToLevel,
-  buildMonthHeatmap,
-};
+export function monthToLevel(count, max) {
+  if (!max || count === 0) return 0;
+  const ratio = count / max;
+  if (ratio >= 0.75) return 4;
+  if (ratio >= 0.5) return 3;
+  if (ratio >= 0.25) return 2;
+  return 1;
+}
+
+export function buildMonthHeatmap(contributionMap, endYearMonth, numMonths = 12) {
+  const monthly = aggregateByMonth(contributionMap);
+  const keys = recentMonthKeys(endYearMonth, numMonths);
+
+  let max = 0;
+  for (const k of keys) {
+    const v = monthly.get(k) ?? 0;
+    if (v > max) max = v;
+  }
+
+  const entries = keys.map(month => {
+    const count = monthly.get(month) ?? 0;
+    const level = monthToLevel(count, max);
+    return { month, count, level };
+  });
+
+  let busiestMonth = null;
+  let busiestCount = 0;
+  for (const { month, count } of entries) {
+    if (count > busiestCount) {
+      busiestCount = count;
+      busiestMonth = month;
+    }
+  }
+
+  return { entries, busiestMonth, maxCount: max };
+}
